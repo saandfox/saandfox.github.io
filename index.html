@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五金倉儲 - 自助掃碼查價系統</title>
+    <!-- 引入 Tailwind CSS 用於美化介面 -->
+    <script src="https://jsdelivr.net"></script>
+    <!-- 引入 Html5-Qrcode 條碼掃描核心庫 -->
+    <script src="https://unpkg.com" type="text/javascript"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+
+    <!-- 頂部導覽列 -->
+    <header class="w-full max-w-md bg-blue-600 text-white text-center py-4 rounded-t-xl shadow-lg">
+        <h1 class="text-xl font-bold">🛠️ 自助掃碼查價系統</h1>
+        <p class="text-xs opacity-80 mt-1">請對準商品條碼或 QR Code 進行掃描</p>
+    </header>
+
+    <!-- 主體內容區 -->
+    <main class="w-full max-w-md bg-white p-6 rounded-b-xl shadow-lg flex flex-col gap-6">
+        
+        <!-- 👁️ 條碼相機掃描區域 -->
+        <div class="relative border-4 border-dashed border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+            <div id="reader" class="w-full"></div>
+        </div>
+
+        <!-- 🔄 控制按鈕 -->
+        <div class="flex gap-2">
+            <button id="start-btn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md">
+                📷 開啟相機
+            </button>
+            <button id="stop-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md hidden">
+                🛑 關閉相機
+            </button>
+        </div>
+
+        <!-- 📊 掃描結果與商品資訊顯示區 -->
+        <div id="result-box" class="border border-gray-200 rounded-lg p-4 bg-gray-50 hidden animate-fade-in">
+            <h3 class="text-sm font-semibold text-gray-500 mb-2">🔍 掃描條碼：<span id="scanned-code" class="text-gray-800 font-mono"></span></h3>
+            
+            <!-- 找到商品時顯示 -->
+            <div id="product-info" class="hidden">
+                <div class="text-2xl font-bold text-gray-900 mb-1" id="prod-name">商品名稱</div>
+                <div class="text-sm text-gray-600 mb-3" id="prod-spec">規格：-</div>
+                <div class="flex justify-between items-center border-t pt-3">
+                    <div>
+                        <span class="text-xs text-gray-500 block">來客特惠價</span>
+                        <span class="text-3xl font-black text-red-600" id="prod-price">$0</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-gray-500 block">倉儲目前庫存</span>
+                        <span class="text-sm font-semibold text-blue-600" id="prod-stock">充足</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 找不到商品時顯示 -->
+            <div id="product-not-found" class="hidden text-center py-4">
+                <p class="text-lg font-bold text-amber-600">⚠️ 未登錄此商品</p>
+                <p class="text-xs text-gray-500 mt-1">請洽詢現場倉儲管理人員人員協助</p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 頁尾宣告 -->
+    <footer class="mt-6 text-xs text-gray-400">
+        &copy; 五金行倉儲管理系統 版權所有
+    </footer>
+
+    <!-- ⚙️ 核心邏輯 JavaScript -->
+    <script>
+        // 1. 📦 模擬五金行商品資料庫 (您可以自由修改條碼、品名與價格)
+        const hardwareDatabase = {
+            "4710123456789": { name: "不鏽鋼六角螺絲 (10入)", spec: "M8 x 20mm / SUS304", price: 85, stock: "庫存 50 包" },
+            "4719876543210": { name: "多功能不鏽鋼美工刀", spec: "SK5 高碳鋼刀片 / 附自動鎖定", price: 120, stock: "庫存 12 把" },
+            "88812345": { name: "高導電絕緣膠帶 (黑)", spec: "0.13mm x 19mm x 20Y", price: 35, stock: "庫存 120 捲" },
+            "A101": { name: "牧田款式 充電式衝擊起子機", spec: "18V / 雙鋰電 / 附工具箱", price: 3850, stock: "庫存 3 台" }
+        };
+
+        let html5QrcodeScanner = null;
+        const resultBox = document.getElementById('result-box');
+        const scannedCode = document.getElementById('scanned-code');
+        const productInfo = document.getElementById('product-info');
+        const productNotFound = document.getElementById('product-not-found');
+        
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+
+        // 2. 📸 當掃描成功時的處理邏輯
+        function onScanSuccess(decodedText, decodedResult) {
+            // 播放一聲簡短的提示音（可選）
+            playBeep();
+            
+            // 顯示結果區塊與條碼
+            resultBox.classList.remove('hidden');
+            scannedCode.innerText = decodedText;
+
+            // 比對資料庫
+            const product = hardwareDatabase[decodedText];
+
+            if (product) {
+                // 找到商品，填入欄位
+                document.getElementById('prod-name').innerText = product.name;
+                document.getElementById('prod-spec').innerText = `規格：${product.spec}`;
+                document.getElementById('prod-price').innerText = `NT$ ${product.price}`;
+                document.getElementById('prod-stock').innerText = product.stock;
+                
+                productInfo.classList.remove('hidden');
+                productNotFound.classList.add('hidden');
+            } else {
+                // 找不到商品
+                productInfo.classList.add('hidden');
+                productNotFound.classList.remove('hidden');
+            }
+        }
+
+        // 3. 🛠️ 初始化與控制相機
+        function startScanner() {
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            
+            // 設定掃描參數：優先使用後置相機 (facingMode: "environment")
+            const config = { 
+                fps: 15, 
+                qrbox: (width, height) => {
+                    return { width: width * 0.8, height: height * 0.4 } // 寬扁型框，極度適合五金常見的一維長條碼
+                },
+                aspectRatio: 1.0
+            };
+
+            html5QrcodeScanner.start(
+                { facingMode: "environment" }, 
+                config, 
+                onScanSuccess
+            ).then(() => {
+                startBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+            }).catch((err) => {
+                alert("無法開啟相機，請檢查瀏覽器是否已授權相機權限！");
+                console.error(err);
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop().then(() => {
+                    html5QrcodeScanner.clear();
+                    startBtn.classList.remove('hidden');
+                    stopBtn.classList.add('hidden');
+                }).catch((err) => {
+                    console.error("關閉相機失敗", err);
+                });
+            }
+        }
+
+        // 監聽按鈕點擊
+        startBtn.addEventListener('click', startScanner);
+        stopBtn.addEventListener('click', stopScanner);
+
+        // 🎵 輔助功能：掃描成功的嗶聲效果
+        function playBeep() {
+            const context = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = context.createOscillator();
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(1000, context.currentTime); // 1000Hz 高音
+            oscillator.connect(context.destination);
+            oscillator.start();
+            oscillator.stop(context.currentTime + 0.1); // 響 0.1 秒
+        }
+    </script>
+</body>
+</html>
